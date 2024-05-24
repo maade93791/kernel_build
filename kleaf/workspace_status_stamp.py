@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2022 The Android Open Source Project
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -230,7 +231,13 @@ class Stamp(object):
             "KLEAF_IGNORE_MISSING_PROJECTS") == "true"
         self.use_kleaf_localversion = os.environ.get(
             "KLEAF_USE_KLEAF_LOCALVERSION") == "true"
+
         self.projects = list_projects()
+        extra_git_project_env_var = os.environ.get("KLEAF_EXTRA_GIT_PROJECTS")
+        if extra_git_project_env_var:
+            self.projects.extend(pathlib.Path(value) for value in
+                                 extra_git_project_env_var.split(":"))
+
         self.init_for_dot_source_date_epoch_dir()
 
     def init_for_dot_source_date_epoch_dir(self) -> None:

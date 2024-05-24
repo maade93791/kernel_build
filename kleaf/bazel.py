@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2022 The Android Open Source Project
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -196,8 +197,25 @@ class BazelWrapper(object):
         group.add_argument(
             "--repo_manifest", metavar="<manifest.xml>",
             help="""Absolute path to repo manifest file, generated with """
-                 """`repo manifest -r`.""",
+                 """`repo manifest -r`. Use --extra_git_project to include """
+                 """Git projects not controlled by repo.""",
             type=_require_absolute_path,
+        )
+        group.add_argument(
+            "--extra_git_project", metavar="PATH",
+            dest="extra_git_projects", action="append",
+            help=textwrap.dedent("""\
+                Multiple uses are accumulated. Specify a Git project besides
+                the ones in `repo` or in --repo_manifest. The value should be
+                the path to the root of the Git project relative to the
+                workspace.
+
+                This is useful if you have an extra Git project not in the
+                repo manifest, but you need to stamp scmversion on the kernel
+                or kernel modules built from this directory.
+            """),
+            type=self._check_extra_git_project,
+            default=[],
         )
         group.add_argument(
             "--ignore_missing_projects",
@@ -227,6 +245,16 @@ class BazelWrapper(object):
             metavar="PATH",
             help="Absolute path to a custom clang toolchain",
             type=_require_absolute_path,
+        )
+
+    def _check_extra_git_project(self, value: str) -> pathlib.Path:
+        path = pathlib.Path(value)
+        if not path.is_absolute():
+            return path
+        if path.is_relative_to(self.root_dir):
+            return path.relative_to(self.root_dir)
+        raise argparse.ArgumentTypeError(
+            f"Must be a relative path against {self.root_dir}",
         )
 
     def _parse_command_args(self):
@@ -277,6 +305,10 @@ class BazelWrapper(object):
 
         if self.known_args.repo_manifest is not None:
             self.env["KLEAF_REPO_MANIFEST"] = self.known_args.repo_manifest
+
+        if self.known_args.extra_git_projects:
+            self.env["KLEAF_EXTRA_GIT_PROJECTS"] = ":".join(
+                str(path) for path in self.known_args.extra_git_projects)
 
         if self.known_args.ignore_missing_projects:
             self.env["KLEAF_IGNORE_MISSING_PROJECTS"] = "true"
